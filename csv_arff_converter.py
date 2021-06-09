@@ -1,15 +1,8 @@
-def checkMissingValue(val: str) -> str:
-    return val if len(val) > 0 else '?'
+CSV = 'C:\\Users\\Utilizador\\Desktop\\data\\water_potability.csv'
+ARFF = 'C:\\Program Files\\Weka-3-8-5\\data\\water_potability.arff'
 
-def processField(idx: int, data: list) -> list:
-    return [checkMissingValue(line.split(',')[idx]) for line in data]
-
-if __name__ == '__main__':
-    csv_path = 'C:\\Users\\Utilizador\\Desktop\\data\\water_potability.csv'
-    arff_path = 'C:\\Program Files\\Weka-3-8-5\\data\\water_potability.arff'
-
-    relation = "water_potability"
-    attributes = [
+RELATION = 'water_potability'
+ATTRIBUTES = [
         "pH numeric",
         "Hardness numeric",
         "Solids numeric",
@@ -20,21 +13,35 @@ if __name__ == '__main__':
         "Trihalomethanes numeric",
         "Turbidity numeric",
         "Potability {0, 1}"
-    ]
+]
+
+# O(1)
+def missing_value(val: str) -> str:
+    return val if len(val) > 0 else '?'
+
+
+def read_csv(path: str) -> str:
     data = []
+    with open(path, 'r') as fp:
+        lines = [line.rstrip('\n').replace(';', ',') for line in fp.readlines()][1:] # ignore csv column names
+        for line in lines:
+            data.append([missing_value(line.split(',')[attIdx]) for attIdx in range(len(ATTRIBUTES))])
+    return data
 
-    with open(csv_path, 'r') as fp:
-        lines = [line.rstrip('\n').replace(';', ',') for line in fp.readlines()][1:]
-        for idx in range(len(attributes)):
-            data.append(processField(idx, lines))
 
-    with open(arff_path, 'w') as fp:
-        fp.write("@relation " + relation + '\n')
+def write_arff(path: str, data: list) -> None:
+    with open(path, 'w') as fp:
+        fp.write("@relation " + RELATION + '\n')
 
-        for attribute in attributes:
+        for attribute in ATTRIBUTES:
             fp.write("@attribute %s\n" % attribute)
 
         fp.write('@data\n')
-        for idx in range(len(data[0])):
-            for att in range(len(data)):
-                fp.write("%s," % data[att][idx] if att + 1 < len(data) else "%s\n" % data[att][idx])
+        for inst in data:
+            for attIdx, att in enumerate(inst):
+                fp.write("%s," % att if attIdx + 1 < len(ATTRIBUTES) else "%s\n" % att)
+
+
+if __name__ == '__main__':
+    data = read_csv(CSV)
+    write_arff(ARFF, data)
