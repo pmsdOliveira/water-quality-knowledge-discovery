@@ -9,6 +9,18 @@ N_ATTRIBUTES = 10
 NOISE = 0.05
 
 
+def read_arff(path: str) -> (list, list):
+    headers, data = [], []
+
+    with open(path, 'r') as fp:
+        lines = [line.rstrip('\n') for line in fp.readlines()]
+        headers = lines[:N_ATTRIBUTES + 2]
+        instances = lines[N_ATTRIBUTES + 2:]
+        for inst in instances:
+            data.append([inst.split(',')[att] for att in range(N_ATTRIBUTES)])
+    return headers, data
+
+
 def yes_no_split(data: list) -> (list, list):
     yes, no = [], []
     for inst in data:
@@ -19,43 +31,38 @@ def yes_no_split(data: list) -> (list, list):
     return yes, no
 
 
-def apply_noise(inst: list) -> list:
-    noisy_inst = inst[:-1] # ignore class
+def apply_noise(inst: list, percent: float) -> list:
+    noisy_inst = inst[:-1]  # ignore class on noise application
+
     for attIdx, att in enumerate(noisy_inst):
-        noise = float(att) * NOISE
+        noise = float(att) * percent
         noisy_inst[attIdx] = str(float(att) + random(-noise, noise))
-    noisy_inst.append(inst[-1])
+    noisy_inst.append(inst[-1])  # append class back to instance
+
     return noisy_inst
 
 
-def balance_classes(data: list, diff: int) -> list:
-    idxs = [randint(0, len(data)) for _ in range(diff)]
-    return [apply_noise(data[i]) for i in idxs]
+def create_missing_instances(data: list, n: int) -> list:
+    idxs = [randint(0, len(data)) for _ in range(n)]
+    return [apply_noise(data[idx], NOISE) for idx in idxs]
+
+
+def write_arff(path: str, headers: list, data: list) -> None:
+    with open(path, 'w') as fp:
+        for h in headers:
+            fp.write(h + '\n')
+        for inst in data:
+            for attIdx, att in enumerate(inst):
+                fp.write("%s," % att if attIdx + 1 < N_ATTRIBUTES else "%s\n" % att)
 
 
 if __name__ == '__main__':
-    data = []
-
-    with open(PROCESSED, 'r') as fp:
-        lines = [line.rstrip('\n') for line in fp.readlines()]
-        headers = lines[:N_ATTRIBUTES + 2]
-        instances = lines[N_ATTRIBUTES + 2:]
-        for inst in instances:
-            data.append([inst.split(',')[att] for att in range(N_ATTRIBUTES)])
-
+    headers, data = read_arff(PROCESSED)
     yes, no = yes_no_split(data)
     diff = abs(len(yes) - len(no))
 
-    new_insts = balance_classes(yes, diff)
+    new_insts = create_missing_instances(yes, diff)
     for inst in new_insts:
-        yes.append(inst)
+        yes.append(inst)  # appending to "yes" because it had less instances than "no"
 
-    with open(BALANCED, 'w') as fp:
-        for h in headers:
-            fp.write(h + '\n')
-        for y in yes:
-            for attIdx, att in enumerate(y):
-                fp.write("%s," % att if attIdx + 1 < N_ATTRIBUTES else "%s\n" % att)
-        for n in no:
-            for attIdx, att in enumerate(n):
-                fp.write("%s," % att if attIdx + 1 < N_ATTRIBUTES else "%s\n" % att)
+    write_arff(BALANCED, headers, yes + no)

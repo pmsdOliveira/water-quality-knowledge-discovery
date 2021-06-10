@@ -10,24 +10,29 @@ N_ATTRIBUTES = 10
 NOISE = 0.05
 
 
-# O(1)
-def has_missing(inst: list) -> list:
-    return True if '?' in inst else False
+def read_arff(path: str) -> (list, list):
+    headers, data = [], []
+
+    with open(path, 'r') as fp:
+        lines = [line.rstrip('\n') for line in fp.readlines()]
+        headers = lines[:N_ATTRIBUTES + 2]
+        instances = lines[N_ATTRIBUTES + 2:]
+        for inst in instances:
+            data.append([inst.split(',')[att] for att in range(N_ATTRIBUTES)])
+    return headers, data
 
 
-# O(n)
 def missing_valid_split(data: list) -> list:
     missing, valid = [], []
     for inst in data:
-        if has_missing(inst):
+        if '?' in inst:
             missing.append(inst)
         else:
             valid.append(inst)
     return missing, valid
 
 
-# O(n)
-def euclidian_distance(x: list, y: list) -> float:
+def euclidean_distance(x: list, y: list) -> float:
     if len(x) != len(y):
         return None
 
@@ -35,54 +40,53 @@ def euclidian_distance(x: list, y: list) -> float:
     for att in range(len(x)):
         if x[att] != '?' and y[att] != '?':
             distance += pow((float(x[att]) - float(y[att])), 2)
-
     return sqrt(distance)
 
-# O(n)
-def apply_noise(inst: list) -> list:
-    noisy_inst = inst[:-1] # ignore class
-    for attIdx, att in enumerate(noisy_inst):
-        noise = float(att) * NOISE
-        noisy_inst[attIdx] = str(float(att) + random(-noise, noise))
-    noisy_inst.append(inst[-1])
-    return noisy_inst
 
-
-# O(n^2)
 def nearest_neighbour(point: list, neighbours: list) -> list:
-    distances = [euclidian_distance(point, neighbour) for neighbour in neighbours]
+    distances = [euclidean_distance(point, neighbour) for neighbour in neighbours]
     nearest = min(distances)
 
     for idx, distance in enumerate(distances):
         if distance == nearest:
-            return apply_noise(neighbours[idx])
+            return neighbours[idx]  # copy closest neighbour's values
     return None
+
+
+def apply_noise(inst: list, percent: float) -> list:
+    noisy_inst = inst[:-1]  # ignore class on noise application
+
+    for attIdx, att in enumerate(noisy_inst):
+        noise = float(att) * percent
+        noisy_inst[attIdx] = str(float(att) + random(-noise, noise))
+    noisy_inst.append(inst[-1])  # append class back to instance
+
+    return noisy_inst
+
+
+def replace_missing_nearest_noisy_valid(missing: list, valid: list) -> list:
+    replaced = missing
+
+    for idx, inst in enumerate(replaced):
+        replaced[idx] = apply_noise(nearest_neighbour(inst, valid), NOISE)
+    return replaced
+
+
+def write_arff(path: str, headers: list, data: list) -> None:
+    with open(path, 'w') as fp:
+        for h in headers:
+            fp.write(h + '\n')
+        for inst in data:
+            for attIdx, att in enumerate(inst):
+                fp.write("%s," % att if attIdx + 1 < N_ATTRIBUTES else "%s\n" % att)
 
 
 if __name__ == '__main__':
     begin = time()
 
-    data = []
-    with open(ORIGINAL, 'r') as fp:
-        lines = [line.rstrip('\n') for line in fp.readlines()]
-        headers = lines[:N_ATTRIBUTES + 2]
-        instances = lines[N_ATTRIBUTES + 2:]
-        for inst in instances:
-            data.append([inst.split(',')[att] for att in range(N_ATTRIBUTES)])
-
-    missing, valids = missing_valid_split(data)
-
-    for idx, inst in enumerate(missing):
-        missing[idx] = nearest_neighbour(inst, valids)
-
-    with open(PROCESSED, 'w') as fp:
-        for h in headers:
-            fp.write(h + '\n')
-        for v in valids:
-            for attIdx, att in enumerate(v):
-                fp.write("%s," % att if attIdx + 1 < N_ATTRIBUTES else "%s\n" % att)
-        for m in missing:
-            for attIdx, att in enumerate(m):
-                fp.write("%s," % att if attIdx + 1 < N_ATTRIBUTES else "%s\n" % att)
+    headers, data = read_arff(ORIGINAL)
+    missing_values, valid_values = missing_valid_split(data)
+    replaced_values = replace_missing_nearest_noisy_valid(missing_values, valid_values)
+    write_arff(PROCESSED, headers, valid_values + replaced_values)
 
     print("Done in %s\n" % (time() - begin))
