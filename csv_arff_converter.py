@@ -15,11 +15,13 @@ ATTRIBUTES = [
         "Potability {0, 1}"
 ]
 
+
 # O(1)
 def missing_value(val: str) -> str:
     return val if len(val) > 0 else '?'
 
 
+# O(n^2)
 def read_csv(path: str) -> str:
     data = []
     with open(path, 'r') as fp:
@@ -29,6 +31,7 @@ def read_csv(path: str) -> str:
     return data
 
 
+# O (n^2)
 def write_arff(path: str, data: list) -> None:
     with open(path, 'w') as fp:
         fp.write("@relation " + RELATION + '\n')
